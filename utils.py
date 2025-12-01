@@ -60,6 +60,7 @@ async def warmup_in_parallel(models):
 async def run_request(base_url, messages, temperature, max_tokens, use_reasoning):
     thinking = ""
     answer = ""
+    symbol_count = 0
     token_count = 0
     in_think = False
     buffer = ""
@@ -76,8 +77,14 @@ async def run_request(base_url, messages, temperature, max_tokens, use_reasoning
         ):
             delta = chunk.choices[0].delta.content if chunk.choices else None
             if not delta:
+                if chunk.usage and chunk.usage.completion_tokens is not None:
+                    token_count = chunk.usage.completion_tokens
                 continue
-            token_count += len(delta)
+            symbol_count += len(delta)
+            if chunk.usage and chunk.usage.completion_tokens is not None:
+                token_count = chunk.usage.completion_tokens
+            else:
+                token_count += 1
             buffer += delta
 
             if "<think>" in buffer:
@@ -96,7 +103,8 @@ async def run_request(base_url, messages, temperature, max_tokens, use_reasoning
                 answer += buffer
                 buffer = ""
 
-            tps = token_count / (time.time() - start + 1e-5)
             elapsed_time = time.time() - start
+            sps = symbol_count / (elapsed_time + 1e-5)
+            tps = token_count / (elapsed_time + 1e-5) if token_count > 0 else 0
 
-            yield thinking, answer, token_count, tps, elapsed_time
+            yield thinking, answer, symbol_count, sps, token_count, tps, elapsed_time
