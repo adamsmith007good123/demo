@@ -48,7 +48,7 @@ st.markdown(
         font-size: 1.05rem;
     }
     .stChatInput div {
-        min-height: 100px
+        min-height: 150px
     }
     .stChatInput div textarea {
         height: 100%
@@ -114,21 +114,13 @@ async def run_model_response(container, model_key):
         placeholder = st.empty()
 
         thinking_stopped = False
-        async for thinking, answer, symbol_count, sps, token_count, tps, elapsed_time in run_request(
+        async for thinking, answer, token_count, tps, elapsed_time in run_request(
             base_url, messages, temperature, max_tokens, reasoning
         ):
-            speed_container.html(f"""<div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
-                                 <div style="flex: 1;">
-                                     <div>{symbol_count} symbols</div>
-                                     <div>{token_count} tokens</div>
-                                 </div>
-                                 <div style="flex: 2;">
-                                     <div><b>Speed:</b> {sps:.2f} symbols/s</div>
-                                     <div><b>Speed:</b> {tps:.2f} tokens/s</div>
-                                 </div>
-                                 <div style="flex: 1;">
-                                     <b>Time:</b> {elapsed_time:.1f}s
-                                 </div>
+            speed_container.html(f"""<div style="display: flex; justify-content: space-between; align-items: center;">
+                                 <span>{token_count} symbols</span>
+                                 <span><b>Speed:</b> {tps:.2f} symbols/s</span>
+                                 <span><b>Time:</b> {elapsed_time:.1f}s</span>
                                  </div>
                                  """)
             if not thinking_stopped and thinking:
@@ -143,7 +135,7 @@ async def run_model_response(container, model_key):
     # Add response to current conversation
     st.session_state.conversations[-1][model_key] = answer
     st.session_state.conversations[-1][f"{model_key}_reasoning"] = thinking
-    st.session_state.last_state[model_key] = (symbol_count, sps, token_count, tps, elapsed_time)
+    st.session_state.last_state[model_key] = (token_count, tps, elapsed_time)
 
 
 conversation_container = st.empty()
@@ -223,19 +215,11 @@ def display_conversations():
         if state is None:
             c.empty()
             continue
-        symbol_count, sps, token_count, tps, elapsed_time = state
-        c.html(f"""<div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
-                    <div style="flex: 1;">
-                        <div>{symbol_count} symbols</div>
-                        <div>{token_count} tokens</div>
-                    </div>
-                    <div style="flex: 2;">
-                        <div><b>Speed:</b> {sps:.2f} symbols/s</div>
-                        <div><b>Speed:</b> {tps:.2f} tokens/s</div>
-                    </div>
-                    <div style="flex: 1;">
-                        <b>Time:</b> {elapsed_time:.1f}s
-                    </div>
+        token_count, tps, elapsed_time = state
+        c.html(f"""<div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>{token_count} tokens</span>
+                    <span><b>Speed:</b> {tps:.2f} symbols/s</span>
+                    <span><b>Time:</b> {elapsed_time:.1f}s</span>
                     </div>
                     """)
 
