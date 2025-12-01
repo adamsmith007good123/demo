@@ -134,6 +134,7 @@ async def run_model_response(container, model_key):
 
     # Add response to current conversation
     st.session_state.conversations[-1][model_key] = answer
+    st.session_state.conversations[-1][f"{model_key}_reasoning"] = thinking
     st.session_state.last_state[model_key] = (token_count, tps, elapsed_time)
 
 
@@ -201,9 +202,13 @@ def display_conversations():
             col1, col2 = st.columns(2)
             with col1:
                 with st.chat_message("assistant"):
+                    if conv.get("model1_reasoning"):
+                        st.expander("Reasoning content", expanded=False).markdown(conv["model1_reasoning"])
                     st.markdown(conv["model1"])
             with col2:
                 with st.chat_message("assistant"):
+                    if conv.get("model2_reasoning"):
+                        st.expander("Reasoning content", expanded=False).markdown(conv["model2_reasoning"])
                     st.markdown(conv["model2"])
     for c, m in ((left_speed_container, "model1"), (right_speed_container, "model2")):
         state = st.session_state.last_state[m]
@@ -248,6 +253,11 @@ with st.sidebar:
         st.warning("Reasoning mode requires more tokens. Consider increasing max tokens.", icon="⚠️")
     
     max_tokens = st.number_input("Tokens", 1, 16384, 1024, 1, disabled=st.session_state.is_generating)
+    
+    if st.button("Clear Chat", disabled=st.session_state.is_generating, use_container_width=True):
+        st.session_state.conversations = []
+        st.session_state.last_state = {"model1": None, "model2": None}
+        st.rerun()
 
 # Accept user input
 with bottom():
