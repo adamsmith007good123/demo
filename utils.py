@@ -97,5 +97,6 @@ async def run_request(base_url, messages, temperature, max_tokens, use_reasoning
                 buffer = ""
 
             tps = token_count / (time.time() - start + 1e-5)
+            elapsed_time = time.time() - start
 
-            yield thinking, answer, token_count, tps
+            yield thinking, answer, token_count, tps, elapsed_time

@@ -1,5 +1,7 @@
 import asyncio
 import os
+from pathlib import Path
+import random
 
 import streamlit as st
 from streamlit_extras.bottom_container import bottom
@@ -45,6 +47,12 @@ st.markdown(
     [data-testid="stHeadingWithActionElements"] h5 {
         font-size: 1.05rem;
     }
+    .stChatInput div {
+        min-height: 150px
+    }
+    .stChatInput div textarea {
+        height: 100%
+    }
 </style>
 """,
     unsafe_allow_html=True,
@@ -55,7 +63,10 @@ if "conversations" not in st.session_state:
 if "input_preset" not in st.session_state:
     st.session_state.input_preset = ""
 if "last_state" not in st.session_state:
-    st.session_state.last_state = {}
+    st.session_state.last_state = {
+        "model1": None,
+        "model2": None,
+    }
 if "is_generating" not in st.session_state:
     st.session_state.is_generating = False
 
@@ -71,23 +82,23 @@ async def run_model_response(container, model_key):
 
     if model_key == "model1":
         base_url = MODEL_HOSTNAME[left_option]
-        model_name = left_option
+        speed_container = left_speed_container
     else:
         base_url = MODEL_HOSTNAME[right_option]
-        model_name = right_option
+        speed_container = right_speed_container
 
     with container.chat_message("assistant"):
-        speed_container = st.empty()
         expander_container = st.empty()
         placeholder = st.empty()
 
         thinking_stopped = False
-        async for thinking, answer, token_count, tps in run_request(
+        async for thinking, answer, token_count, tps, elapsed_time in run_request(
             base_url, messages, temperature, max_tokens, reasoning_choice
         ):
-            speed_container.html(f"""<div style="display: flex; justify-content: space-between; align-items: center; font-size: 10px; opacity: 70%">
-                                 <span>{model_name}</span>
+            speed_container.html(f"""<div style="display: flex; justify-content: space-between; align-items: center;">
+                                 <span>{token_count} tokens</span>
                                  <span><b>Speed:</b> {tps:.2f} symbols/s</span>
+                                 <span><b>Time:</b> {elapsed_time:.1f}s</span>
                                  </div>
                                  """)
             if not thinking_stopped and thinking:
@@ -101,6 +112,7 @@ async def run_model_response(container, model_key):
 
     # Add response to current conversation
     st.session_state.conversations[-1][model_key] = answer
+    st.session_state.last_state[model_key] = (token_count, tps, elapsed_time)
 
 
 conversation_container = st.empty()
@@ -120,6 +132,18 @@ def display_conversations():
             with col2:
                 with st.chat_message("assistant"):
                     st.markdown(conv["model2"])
+    for c, m in ((left_speed_container, "model1"), (right_speed_container, "model2")):
+        state = st.session_state.last_state[m]
+        if state is None:
+            c.empty()
+            continue
+        token_count, tps, elapsed_time = state
+        c.html(f"""<div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>{token_count} tokens</span>
+                    <span><b>Speed:</b> {tps:.2f} symbols/s</span>
+                    <span><b>Time:</b> {elapsed_time:.1f}s</span>
+                    </div>
+                    """)
 
 
 async def run_both_models(prompt):
@@ -152,6 +176,7 @@ with st.sidebar:
 with bottom():
     col_left_sel, col_right_sel = st.columns(2)
     with col_left_sel:
+        left_speed_container = st.empty()
         left_status = st.empty()
         left_option = st.selectbox(
             "Left model",
@@ -160,6 +185,7 @@ with bottom():
         )
 
     with col_right_sel:
+        right_speed_container = st.empty()
         right_status = st.empty()
         right_option = st.selectbox(
             "Right model",
@@ -181,7 +207,7 @@ if prompt := st.chat_input(disabled=st.session_state.is_generating, on_submit=di
     models_to_warm.append(
         {"name": f"Right ({right_option})", "host": MODEL_HOSTNAME[right_option], "placeholder": right_status}
     )
-
+    display_conversations()
     with st.spinner(
         "Selected models are hosted on serverless RunPod. Cold starts can take up to ~5 minutes.\nStarting selected models..."
     ):
@@ -195,13 +221,18 @@ else:
     display_conversations()
 
 
-PROMPTS_DIR = "prompts"
-prompt_presets = {}
-for fname in os.listdir(PROMPTS_DIR):
-    if fname.endswith(".txt"):
-        label = fname.replace(".txt", "").replace("_", " ")
-        with open(os.path.join(PROMPTS_DIR, fname), encoding="utf-8") as f:
-            prompt_presets[label] = f.read().strip()
+
+PROMPTS_DIR = Path("prompts")
+prompt_presets: dict[str, list[str]] = {}
+
+# prompt loading
+for category_dir in PROMPTS_DIR.iterdir():
+    if category_dir.is_dir():
+        prompts = []
+        for prompt_file in category_dir.glob("*.txt"):
+            prompts.append(prompt_file.read_text().strip())
+        if prompts:
+            prompt_presets[category_dir.name] = prompts
 
 
 with bottom():
@@ -210,6 +241,6 @@ with bottom():
         for e, v in prompt_presets.items():
             st.button(
                 e,
-                on_click=lambda p=v: st.session_state.update({"input_preset": p}),
+                on_click=lambda p=random.choice(v): st.session_state.update({"input_preset": p}),
                 disabled=st.session_state.is_generating,
             )

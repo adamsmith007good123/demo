@@ -1,1 +1,0 @@
-Evaluate the integral: \int_{0}^{\pi/2} \sin^3(x)\,dx. Provide the answer in exact form. Solve step by step every intermidiate math formula
