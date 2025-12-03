@@ -27,7 +27,7 @@ def health_check_with_retry(base_url, api_key, max_wait_seconds=600, delay=5):
     start = time.time()
     while time.time() - start < max_wait_seconds:
         try:
-            resp = requests.get(f"{ping_base}/ping", headers=headers, timeout=10)
+            resp = requests.get(f"{ping_base}/ping", headers=headers, timeout=60)
             print(f"Health check response from {ping_base}/ping: {resp.status_code}")
             if resp.status_code == 200:
                 return True
